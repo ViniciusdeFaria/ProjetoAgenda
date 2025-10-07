@@ -22,18 +22,32 @@ namespace ProjetoAgenda.dominio.Entidades
         private void SetSenha(string senha)
         {
             if (string.IsNullOrWhiteSpace(senha) || senha.Length < 6)
-                throw new ArgumentException("Senha inválida (mínimo 6 caracteres)");
+                AdicionarNotificacao("Senha inválida (mínimo 6 caracteres)");
 
             // Pelo menos uma letra (maiúscula ou minúscula)
             if (!Regex.IsMatch(senha, @"[a-zA-Z]"))
-                throw new ArgumentException("Senha inválida (deve conter pelo menos uma letra)");
+                AdicionarNotificacao("Senha inválida (deve conter pelo menos uma letra)");
+
 
             // Pelo menos um caractere especial
             if (!Regex.IsMatch(senha, @"[^a-zA-Z0-9]"))
-                throw new ArgumentException("Senha inválida (deve conter pelo menos um caractere especial)");
-
-            Senha = senha;
+                AdicionarNotificacao("Senha inválida (deve conter pelo menos um caractere especial)");
+           
+            if (Valido) 
+                Senha = senha;
         }
+
+        private bool EhAdministradorAtivo()
+        {
+            if (!Administrador)
+                AdicionarNotificacao("Este Usuario não é um Administrador");
+
+            if (Administrador && !Ativo)
+                AdicionarNotificacao("Este Administrador não está ativo");
+
+            return Valido;
+        }
+
         #endregion
 
         #region construtores
@@ -63,7 +77,11 @@ namespace ProjetoAgenda.dominio.Entidades
         public void SetNome(string nome)
         {
             if (string.IsNullOrWhiteSpace(nome))
-                throw new ArgumentException("Nome inválido");
+            {
+                AdicionarNotificacao("Nome inválido");
+                return;
+            }
+                
 
             Nome = nome.Trim();
         }
@@ -72,7 +90,11 @@ namespace ProjetoAgenda.dominio.Entidades
         public void SetEmail(string email)
         {
             if (string.IsNullOrWhiteSpace(email) || !email.Contains("@"))
-                throw new ArgumentException("Email inválido");
+            {
+                AdicionarNotificacao("Email inválido");
+                return;
+            }
+               
 
             Email = email.Trim();
 
@@ -81,11 +103,25 @@ namespace ProjetoAgenda.dominio.Entidades
 
         public ResultadoGenerico<bool> AlterarSenha(string senhaAtual, string novaSenha, string confirmacaoSenha)
         {
+            if (string.IsNullOrWhiteSpace(senhaAtual) || string.IsNullOrWhiteSpace(novaSenha) || string.IsNullOrWhiteSpace(confirmacaoSenha))
+            {
+                AdicionarNotificacao("Para alterar senha, todos os campos são obrigatórios!");
+                return new ResultadoGenerico<bool>(false, ObterMensagensDeErros(), false);
+            }
+
             if (Senha != senhaAtual)
-                return new ResultadoGenerico<bool>(false, "Senha atual incorreta", false);
+            {
+                AdicionarNotificacao("Senha atual diferente!");
+                return new ResultadoGenerico<bool>(false, ObterMensagensDeErros(), false);
+            }
+               
 
             if (novaSenha != confirmacaoSenha)
-                return new ResultadoGenerico<bool>(false, "Confirmação de senha não confere!", false);
+            {
+                AdicionarNotificacao("Confirmação de senha não confere!");
+                return new ResultadoGenerico<bool>(false, ObterMensagensDeErros(), false);
+            }
+                
 
             SetSenha(novaSenha);
 
@@ -102,40 +138,66 @@ namespace ProjetoAgenda.dominio.Entidades
         public void AdicionarEndereco(Endereco endereco)
         {
             if (endereco is null)
-                throw new ArgumentNullException("Endereço invalido");
+            {
+                AdicionarNotificacao("Endereço informado errado!");
+                 return;
+            }
+            
+            if (endereco.IdUsuario != Id)
+            {
+                AdicionarNotificacao("Endereço pertence a outro Usuario!");
+                return;
+            }
 
             _enderecos.Add(endereco);
         }
 
 
+        public ResultadoGenerico<bool> AlterarStatus(Usuario usuarioAlvo, bool novoStatus)
+        {
+            if (!EhAdministradorAtivo())
+                return new ResultadoGenerico<bool>(false, this.ObterMensagensDeErros(), false);
+
+            if (ReferenceEquals(this, usuarioAlvo) || this.Id == usuarioAlvo.Id)
+                usuarioAlvo.AdicionarNotificacao("Um usuario não pode gerenciar a si mesmo");
+
+            if (usuarioAlvo.Administrador)
+                usuarioAlvo.AdicionarNotificacao("Usuario alvo é um Administrador e não pode ser alterado!");
+
+            if (novoStatus == usuarioAlvo.Ativo)
+            {
+                var mensagemErroAtivacao = novoStatus ? "Usuario alvo já está ativo" : "Usuario alvo ja está desativado";
+                usuarioAlvo.AdicionarNotificacao(mensagemErroAtivacao);
+            }
+                    
+            if (!this.Valido || !usuarioAlvo.Valido)
+            {
+                var mensagemErros = string.Join(" | ", new[]
+                {
+                    this.ObterMensagensDeErros(),
+                    usuarioAlvo.ObterMensagensDeErros()
+                }.Where(x => !string.IsNullOrEmpty(x)));
+
+                return new ResultadoGenerico<bool> (false, mensagemErros, false);
+            }
+
+            usuarioAlvo.Ativo = novoStatus;
+            var msg = novoStatus ? "Usuario foi ativado com sucesso" : "Usuario foi desativado com sucesso";
+                return new ResultadoGenerico<bool>(true, msg, true);
+        }
         public static ResultadoGenerico<Usuario> Criar(string nome, string email, string senha, long? id)
         {
-            try
-            {
-                if (id is not null)
-                    return new ResultadoGenerico<Usuario>(
-                        true,
-                        "Usuario criado com sucesso.",
-                        new Usuario(nome, email, senha, id)
-                    );
+            var usuario = new Usuario(nome, email, senha, id);
 
-                return new ResultadoGenerico<Usuario>(
-                    true,
-                    "Usuário criado com sucesso!",
-                    new Usuario(nome, email, senha, null)
-                );
-            }
-            catch (Exception ex)
+            if (!usuario.Valido)
             {
-                return new ResultadoGenerico<Usuario>(
-                    false,
-                    "Falha ao criar o usuario: " + ex.Message,
-                     null
-                );
+                return new ResultadoGenerico<Usuario>(false, usuario.ObterMensagensDeErros(), null);
             }
 
-            #endregion
+            return new ResultadoGenerico<Usuario>(true, "Usuario criado com sucesso", usuario);
+
 
         }
+        #endregion
     }
 }
