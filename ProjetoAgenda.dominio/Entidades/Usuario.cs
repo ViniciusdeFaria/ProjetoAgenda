@@ -16,6 +16,11 @@ namespace ProjetoAgenda.dominio.Entidades
         private readonly List<Endereco> _enderecos = new();
         public IReadOnlyCollection<Endereco> Enderecos => _enderecos.AsReadOnly();
 
+        private readonly List<Servico> _servicos = new();
+        public IReadOnlyCollection<Servico> Servicos => _servicos.AsReadOnly();
+        private readonly List<Agendamento> _agendamentos = new();
+        public IReadOnlyCollection<Agendamento> Agendamentos => _agendamentos.AsReadOnly();
+
         #endregion
 
         #region metodos privados
@@ -32,8 +37,8 @@ namespace ProjetoAgenda.dominio.Entidades
             // Pelo menos um caractere especial
             if (!Regex.IsMatch(senha, @"[^a-zA-Z0-9]"))
                 AdicionarNotificacao("Senha inválida (deve conter pelo menos um caractere especial)");
-           
-            if (Valido) 
+
+            if (Valido)
                 Senha = senha;
         }
 
@@ -81,7 +86,7 @@ namespace ProjetoAgenda.dominio.Entidades
                 AdicionarNotificacao("Nome inválido");
                 return;
             }
-                
+
 
             Nome = nome.Trim();
         }
@@ -94,7 +99,7 @@ namespace ProjetoAgenda.dominio.Entidades
                 AdicionarNotificacao("Email inválido");
                 return;
             }
-               
+
 
             Email = email.Trim();
 
@@ -114,14 +119,14 @@ namespace ProjetoAgenda.dominio.Entidades
                 AdicionarNotificacao("Senha atual diferente!");
                 return new ResultadoGenerico<bool>(false, ObterMensagensDeErros(), false);
             }
-               
+
 
             if (novaSenha != confirmacaoSenha)
             {
                 AdicionarNotificacao("Confirmação de senha não confere!");
                 return new ResultadoGenerico<bool>(false, ObterMensagensDeErros(), false);
             }
-                
+
 
             SetSenha(novaSenha);
 
@@ -140,9 +145,9 @@ namespace ProjetoAgenda.dominio.Entidades
             if (endereco is null)
             {
                 AdicionarNotificacao("Endereço informado errado!");
-                 return;
+                return;
             }
-            
+
             if (endereco.IdUsuario != Id)
             {
                 AdicionarNotificacao("Endereço pertence a outro Usuario!");
@@ -169,7 +174,7 @@ namespace ProjetoAgenda.dominio.Entidades
                 var mensagemErroAtivacao = novoStatus ? "Usuario alvo já está ativo" : "Usuario alvo ja está desativado";
                 usuarioAlvo.AdicionarNotificacao(mensagemErroAtivacao);
             }
-                    
+
             if (!this.Valido || !usuarioAlvo.Valido)
             {
                 var mensagemErros = string.Join(" | ", new[]
@@ -178,12 +183,12 @@ namespace ProjetoAgenda.dominio.Entidades
                     usuarioAlvo.ObterMensagensDeErros()
                 }.Where(x => !string.IsNullOrEmpty(x)));
 
-                return new ResultadoGenerico<bool> (false, mensagemErros, false);
+                return new ResultadoGenerico<bool>(false, mensagemErros, false);
             }
 
             usuarioAlvo.Ativo = novoStatus;
             var msg = novoStatus ? "Usuario foi ativado com sucesso" : "Usuario foi desativado com sucesso";
-                return new ResultadoGenerico<bool>(true, msg, true);
+            return new ResultadoGenerico<bool>(true, msg, true);
         }
         public static ResultadoGenerico<Usuario> Criar(string nome, string email, string senha, long? id)
         {
@@ -198,6 +203,36 @@ namespace ProjetoAgenda.dominio.Entidades
 
 
         }
+
+        public void AdicionarServico(Servico servico)
+        {
+            if (servico is null)
+            {
+                AdicionarNotificacao("Serviço inválido.");
+                return;
+            }
+
+            if (servico.IdUsuario != this.Id)
+            {
+                AdicionarNotificacao("Serviço pertence a outro usuário.");
+                return;
+            }
+
+
+
+            
+        }
+
+        public void AdicionarAgendamento(Agendamento agendamento)
+        {
+            if (agendamento is null)
+            {
+                AdicionarNotificacao("Agendamento inválido.");
+                return;
+            }
+
+            _agendamentos.Add(agendamento);
+        }
         #endregion
     }
-}
+}    
